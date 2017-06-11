@@ -1,35 +1,47 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package app.main;
 
+import java.io.File;
+import java.net.Socket;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.Socket;
 import java.util.StringTokenizer;
 
 /**
- *
+ * Client handler.
+ * 
+ * @author Erik Galloway <erik@fliplearning.com>
  * @author Miao Yu
  */
-public class ClientHandler implements Runnable {
+public class ClientHandler implements Runnable
+{
 
     private final Socket socket;
-    File fileName = new File("src/app/files/server/ServerDiaryCopy.txt");
+    protected File file;
 
-    public ClientHandler(Socket socket) {
+    /**
+     * ClientHandler constructor.
+     *
+     * @param Socket socket
+     * @return void
+     */
+    public ClientHandler(Socket socket)
+    {
         this.socket = socket;
+        this.file = new File("src/app/files/server/ServerDiaryCopy.txt");
     }
 
-    @
-            Override
-    public void run() {
+    /**
+     * Make a class runnable.
+     *
+     * @Override
+     * @return void
+     */
+    public void run()
+    {
         System.out.println("\nClientHandler Started for "
                 + this.socket);
         handleRequest(this.socket);
@@ -37,39 +49,60 @@ public class ClientHandler implements Runnable {
                 + this.socket + "\n");
     }
 
-    public void handleRequest(Socket socket) {
-        try (BufferedReader in = new BufferedReader(
-                new InputStreamReader(socket.getInputStream()));) {
-            String headerLine = in.readLine();
-            StringTokenizer tokenizer
-                    = new StringTokenizer(headerLine);
+    /**
+     * Handle a HTTP request.
+     *
+     * @param Socket socket
+     * @return void
+     */
+    public void handleRequest(Socket socket)
+    {
+    
+        try (
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
+        ) {
+            
+            StringTokenizer tokenizer = new StringTokenizer(in.readLine());
+
             String httpMethod = tokenizer.nextToken();
+
             if (httpMethod.equals("GET")) {
+
                 System.out.println("Get method processed");
+                
                 String httpQueryString = tokenizer.nextToken();
+                
                 StringBuilder responseBuffer = new StringBuilder();
-                responseBuffer
-                        .append("<html><h1>WebServer Home Page.... </h1><br>")
-                        .append("<b>Welcome to my web server!</b><BR>")
-                        .append("<b>Diary: ")
-                        .append(readFromDiary())
-                        .append("</b><BR>")
-                        .append("</html>");
-                sendResponse(socket, 200, responseBuffer.toString());
-            } 
-            if (httpMethod.equals("POST")){
+                
+                responseBuffer.append("<html><h1>WebServer Home Page.... </h1><br>")
+                    .append("<b>Welcome to my web server!</b><BR>")
+                    .append("<b>Diary: ")
+                    .append(readFromDiary())
+                    .append("</b><BR>")
+                    .append("</html>");
+                
+                this.sendResponse(socket, 200, responseBuffer.toString());
+
+            } else if (httpMethod.equals("POST")) {
+
                 System.out.println("Post method received");
+                
                 String httpQueryString = tokenizer.nextToken();
-                writeToDiary(httpQueryString);
+                String userAgent = in.readLine();
+                String requestData = in.readLine();
+                this.writeToDiary(requestData);
+                
                 StringBuilder responseBuffer = new StringBuilder();
+                
                 responseBuffer
                         .append("<html><h1>Successful Write to Server</h1><br>")
                         .append("<b>Thank you for updating the server!</b><BR>")
                         .append("<b>Updated Diary: ")
-                        .append(readFromDiary())
+                        .append(this.readFromDiary())
                         .append("</b><BR>")
                         .append("</html>");
-                sendResponse(socket, 201, responseBuffer.toString());
+                
+                this.sendResponse(socket, 200, responseBuffer.toString());
             }    
             else {
                 System.out.println("The HTTP method is not recognized");
@@ -80,32 +113,51 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    //Reads from diary.txt, file specified above
-    public String readFromDiary() {
+    /**
+     * Read the text from the diary file.
+     *
+     * @return String
+     */
+    public String readFromDiary()
+    {
         
+        String message = "";
+        String readLine = "";
+
         try {
-            BufferedReader in = new BufferedReader(new FileReader(fileName));
-            String readLine = "";
-            String message = "";
+
+            BufferedReader in = new BufferedReader(new FileReader(this.file));
+
             System.out.println("Reading file using Buffered Reader");
+
             while ((readLine = in.readLine()) != null) {
                 System.out.println(readLine);
                 message += readLine + "/n";
             }
-            return message;
+
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return null;
+        
+        return message;
     }
     
+    /**
+     * Send the HTTP response.
+     *
+     * @param Socket socket
+     * @param int statusCode
+     * @param String responseString
+     */
     public void sendResponse(Socket socket,
-            int statusCode, String responseString) {
+            int statusCode, String responseString)
+    {
         String statusLine;
         String serverHeader = "Server: WebServer\r\n";
         String contentTypeHeader = "Content‐Type: text/html\r\n";
         try (DataOutputStream out
                 = new DataOutputStream(socket.getOutputStream());) {
+            
             if (statusCode == 200) {
                 statusLine = "HTTP/1.0 200 OK" + "\r\n";
                 String contentLengthHeader = "Content‐Length: "
@@ -127,7 +179,22 @@ public class ClientHandler implements Runnable {
             }
             out.close();
         } catch (IOException ex) {
-// Handle exception
+            ex.printStackTrace();
+        }
+    }
+
+    /**
+     * Wrtie the content to the diary file.
+     *
+     * @param String content
+     * @return void
+     */
+    protected void writeToDiary(String content)
+    {
+        try (FileWriter fw = new FileWriter("src/app/files/server/ServerDiaryCopy.txt", true)) {
+            fw.write(content + "\r\n");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
